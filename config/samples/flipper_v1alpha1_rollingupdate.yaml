@@ -1,0 +1,9 @@
+apiVersion: flipper.example.com/v1alpha1
+kind: RollingUpdate
+metadata:
+  labels:
+    app.kubernetes.io/name: flipper-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: rollingupdate-sample
+spec:
+  # TODO(user): Add fields here

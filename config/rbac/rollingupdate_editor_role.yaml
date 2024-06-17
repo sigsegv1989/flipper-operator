@@ -1,0 +1,27 @@
+# permissions for end users to edit rollingupdates.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: flipper-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: rollingupdate-editor-role
+rules:
+- apiGroups:
+  - flipper.example.com
+  resources:
+  - rollingupdates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - flipper.example.com
+  resources:
+  - rollingupdates/status
+  verbs:
+  - get

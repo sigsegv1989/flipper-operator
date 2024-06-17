@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- flipper_v1alpha1_rollingupdate.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples
