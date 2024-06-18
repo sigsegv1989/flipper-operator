@@ -61,6 +61,15 @@ spec:
           status:
             description: RollingUpdateStatus defines the observed state of RollingUpdate
             properties:
+              deployments:
+                description: |-
+                  Deployments stores the list of deployments that were restarted by this RollingUpdate CR.
+                  This allows for back tracing to identify which deployments were affected by a particular
+                  rolling restart or rollout operation initiated by this RollingUpdate custom resource.
+                  Each entry in the list represents the name of a deployment in the format "name".
+                items:
+                  type: string
+                type: array
               lastRolloutTime:
                 description: |-
                   LastRolloutTime indicates the timestamp of the last rolling restart or rollout operation.

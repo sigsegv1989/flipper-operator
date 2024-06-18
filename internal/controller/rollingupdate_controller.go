@@ -79,16 +79,16 @@ func (r *RollingUpdateReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	now := time.Now()
 	if rollingUpdate.Status.LastRolloutTime.Time.IsZero() ||
 		now.Sub(rollingUpdate.Status.LastRolloutTime.Time) > interval {
-
 		log.V(1).Info("Time to rolling restart resources", "lastRolloutTime", rollingUpdate.Status.LastRolloutTime, "now", now, "interval", interval)
 
-		err = r.restartDeployments(ctx, req, rollingUpdate.Spec.MatchLabels)
+		deployments, err := r.restartDeployments(ctx, req, rollingUpdate.Spec.MatchLabels)
 		if err != nil {
 			log.Error(err, "Failed to restart deployments")
 			return ctrl.Result{}, err
 		}
 
 		rollingUpdate.Status.LastRolloutTime = metav1.Now()
+		rollingUpdate.Status.Deployments = deployments
 		err = r.Status().Update(ctx, rollingUpdate)
 		if err != nil {
 			log.Error(err, "Failed to update rollingUpdate status")
@@ -101,22 +101,23 @@ func (r *RollingUpdateReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{RequeueAfter: interval}, nil
 }
 
-func (r *RollingUpdateReconciler) restartDeployments(ctx context.Context, req ctrl.Request, labels map[string]string) error {
+func (r *RollingUpdateReconciler) restartDeployments(ctx context.Context, req ctrl.Request, labels map[string]string) ([]string, error) {
 	log := r.Log.WithValues("namespace", req.Namespace, "name", req.Name)
 
 	log.V(1).Info("Listing deployments for rolling restart", "labels", labels)
 	log.V(1).Info("Checking deployment labels", "namespace", req.Namespace, "expectedLabels", labels)
 
 	deployments := &appsv1.DeploymentList{}
-	// labels = map[string]string{"app": "nginx"}
 	err := r.List(ctx, deployments, client.InNamespace(req.Namespace), client.MatchingLabels(labels))
 	if err != nil {
 		log.Error(err, "Failed to list deployments", "labels", labels)
-		return err
+		return []string{}, err
 	}
 	log.V(1).Info("Deployments listed", "deploymentCount", len(deployments.Items))
 
+	deploys := []string{}
 	for _, deployment := range deployments.Items {
+		deploys = append(deploys, deployment.Name)
 		log.V(1).Info("Restarting deployment", "namespace", deployment.Namespace, "name", deployment.Name)
 
 		annotations := map[string]string{
@@ -133,12 +134,13 @@ func (r *RollingUpdateReconciler) restartDeployments(ctx context.Context, req ct
 
 		if err != nil {
 			log.Error(err, "Failed to update deployment", "name", deployment.Name)
-			return fmt.Errorf("failed to update Deployment %s/%s: %v", deployment.Namespace, deployment.Name, err)
+			return []string{}, fmt.Errorf("failed to update Deployment %s/%s: %v", deployment.Namespace, deployment.Name, err)
 		}
 
 		log.Info("Successfully rolling restarted deployment", "name", deployment.Name)
 	}
-	return nil
+
+	return deploys, nil
 }
 
 func (r *RollingUpdateReconciler) updateAnnotations(deployment *appsv1.Deployment, annotations map[string]string) {

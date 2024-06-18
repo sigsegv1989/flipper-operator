@@ -54,6 +54,13 @@ type RollingUpdateStatus struct {
 	// If not set, it indicates that no rolling restart or rollout has been performed yet.
 	// +optional
 	LastRolloutTime metav1.Time `json:"lastRolloutTime,omitempty"`
+
+	// Deployments stores the list of deployments that were restarted by this RollingUpdate CR.
+	// This allows for back tracing to identify which deployments were affected by a particular
+	// rolling restart or rollout operation initiated by this RollingUpdate custom resource.
+	// Each entry in the list represents the name of a deployment in the format "name".
+	// +optional
+	Deployments []string `json:"deployments,omitempty"`
 }
 
 // +kubebuilder:object:root=true
