@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -38,7 +39,7 @@ var _ = Describe("RollingUpdate Controller", func() {
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Namespace: "default",
 		}
 		rollingupdate := &flipperv1alpha1.RollingUpdate{}
 
@@ -51,7 +52,12 @@ var _ = Describe("RollingUpdate Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: flipperv1alpha1.RollingUpdateSpec{
+						MatchLabels: map[string]string{
+							"key1": "value1",
+						},
+						Interval: "1m",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
@@ -66,6 +72,7 @@ var _ = Describe("RollingUpdate Controller", func() {
 			By("Cleanup the specific resource instance RollingUpdate")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
+
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
 			controllerReconciler := &RollingUpdateReconciler{
@@ -73,12 +80,24 @@ var _ = Describe("RollingUpdate Controller", func() {
 				Scheme: k8sClient.Scheme(),
 			}
 
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+			res, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+			Expect(res.RequeueAfter).To(BeNumerically("==", time.Minute))
+
+			rollingupdate := &flipperv1alpha1.RollingUpdate{}
+			By("getting the custom resource for the Kind RollingUpdate")
+			err = k8sClient.Get(ctx, typeNamespacedName, rollingupdate)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(rollingupdate.Status.LastRolloutTime.IsZero()).NotTo(BeTrue())
+			Expect(rollingupdate.Status.Deployments).To(BeEmpty())
+
+			// Allow for some time discrepancy in the comparison
+			lastRolloutTime := rollingupdate.Status.LastRolloutTime.Time
+			now := time.Now()
+			Expect(now.Sub(lastRolloutTime)).To(BeNumerically("<", time.Second*5))
 		})
 	})
 })

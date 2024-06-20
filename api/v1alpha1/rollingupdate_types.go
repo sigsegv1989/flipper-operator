@@ -59,6 +59,8 @@ type RollingUpdateStatus struct {
 	// This allows for back tracing to identify which deployments were affected by a particular
 	// rolling restart or rollout operation initiated by this RollingUpdate custom resource.
 	// Each entry in the list represents the name of a deployment in the format "name".
+	// The namespace of the deployment can be inferred as the namespace where this RollingUpdate CR
+	// is installed, which can be retrieved from the metadata section of this custom resource.
 	// +optional
 	Deployments []string `json:"deployments,omitempty"`
 }

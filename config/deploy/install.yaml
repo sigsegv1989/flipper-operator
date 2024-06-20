@@ -1,0 +1,327 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: flipper-operator
+    control-plane: controller-manager
+  name: flipper-operator-system
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.15.0
+  name: rollingupdates.flipper.example.com
+spec:
+  group: flipper.example.com
+  names:
+    kind: RollingUpdate
+    listKind: RollingUpdateList
+    plural: rollingupdates
+    singular: rollingupdate
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: RollingUpdate is the Schema for the rollingupdates API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: RollingUpdateSpec defines the desired state of RollingUpdate
+            properties:
+              interval:
+                default: 24h
+                description: |-
+                  Interval specifies the time interval between rollouts.
+                  It must be a valid duration string, such as "12h" or "30m".
+                pattern: ^[0-9]+(m|h|d|w)?$
+                type: string
+              matchLabels:
+                additionalProperties:
+                  type: string
+                description: |-
+                  MatchLabels specifies a set of {key, value} pairs used to select specific resources based on labels.
+                  If specified, only resources matching all key-value pairs will be considered for rollout.
+                  If MatchLabels is not specified, all resources in the namespace will be considered for rollout.
+                  Each {key, value} pair in MatchLabels is equivalent to a label selector requirement using the "In" operator,
+                  where the requirement's key field matches the key, the operator is "In", and the values array contains only the value.
+                  The requirements are ANDed together.
+                type: object
+            type: object
+          status:
+            description: RollingUpdateStatus defines the observed state of RollingUpdate
+            properties:
+              deployments:
+                description: |-
+                  Deployments stores the list of deployments that were restarted by this RollingUpdate CR.
+                  This allows for back tracing to identify which deployments were affected by a particular
+                  rolling restart or rollout operation initiated by this RollingUpdate custom resource.
+                  Each entry in the list represents the name of a deployment in the format "name".
+                  The namespace of the deployment can be inferred as the namespace where this RollingUpdate CR
+                  is installed, which can be retrieved from the metadata section of this custom resource.
+                items:
+                  type: string
+                type: array
+              lastRolloutTime:
+                description: |-
+                  LastRolloutTime indicates the timestamp of the last rolling restart or rollout operation.
+                  If not set, it indicates that no rolling restart or rollout has been performed yet.
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: flipper-operator
+  name: flipper-operator-controller-manager
+  namespace: flipper-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: flipper-operator
+  name: flipper-operator-leader-election-role
+  namespace: flipper-operator-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: flipper-operator-manager-role
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - flipper.example.com
+  resources:
+  - rollingupdates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - flipper.example.com
+  resources:
+  - rollingupdates/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - flipper.example.com
+  resources:
+  - rollingupdates/status
+  verbs:
+  - get
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: flipper-operator
+  name: flipper-operator-rollingupdate-editor-role
+rules:
+- apiGroups:
+  - flipper.example.com
+  resources:
+  - rollingupdates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - flipper.example.com
+  resources:
+  - rollingupdates/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: flipper-operator
+  name: flipper-operator-rollingupdate-viewer-role
+rules:
+- apiGroups:
+  - flipper.example.com
+  resources:
+  - rollingupdates
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - flipper.example.com
+  resources:
+  - rollingupdates/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: flipper-operator
+  name: flipper-operator-leader-election-rolebinding
+  namespace: flipper-operator-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: flipper-operator-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: flipper-operator-controller-manager
+  namespace: flipper-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: flipper-operator
+  name: flipper-operator-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: flipper-operator-manager-role
+subjects:
+- kind: ServiceAccount
+  name: flipper-operator-controller-manager
+  namespace: flipper-operator-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: flipper-operator
+    control-plane: controller-manager
+  name: flipper-operator-controller-manager
+  namespace: flipper-operator-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        control-plane: controller-manager
+    spec:
+      containers:
+      - args:
+        - --leader-elect
+        - --health-probe-bind-address=:8081
+        command:
+        - /manager
+        image: pai314/flipper-operator:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: flipper-operator-controller-manager
+      terminationGracePeriodSeconds: 10

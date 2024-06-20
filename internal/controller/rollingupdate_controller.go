@@ -43,6 +43,7 @@ type RollingUpdateReconciler struct {
 // +kubebuilder:rbac:groups=flipper.example.com,resources=rollingupdates,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=flipper.example.com,resources=rollingupdates/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=flipper.example.com,resources=rollingupdates/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
