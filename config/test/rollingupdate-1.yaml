@@ -1,0 +1,7 @@
+apiVersion: flipper.example.com/v1alpha1
+kind: RollingUpdate
+metadata:
+  name: rollingupdate-1
+  namespace: test-1
+spec:
+  interval: "3m"

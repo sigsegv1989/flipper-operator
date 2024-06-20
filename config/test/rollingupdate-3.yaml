@@ -1,0 +1,10 @@
+apiVersion: flipper.example.com/v1alpha1
+kind: RollingUpdate
+metadata:
+  name: rollingupdate-3
+  namespace: test-3
+spec:
+  interval: "10m"
+  matchLabels:
+    app: nginx
+    version: v1

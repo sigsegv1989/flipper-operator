@@ -5,16 +5,6 @@ metadata:
 
 ---
 
-apiVersion: flipper.example.com/v1alpha1
-kind: RollingUpdate
-metadata:
-  name: rollingupdate-1
-  namespace: test-1
-spec:
-  interval: "3m"
-
----
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -23,7 +13,7 @@ metadata:
   labels:
     app: nginx-v1
 spec:
-  replicas: 3
+  replicas: 2
   selector:
     matchLabels:
       app: nginx-v1
@@ -48,7 +38,7 @@ metadata:
   labels:
     app: nginx-v2
 spec:
-  replicas: 4
+  replicas: 2
   selector:
     matchLabels:
       app: nginx-v2
@@ -73,7 +63,7 @@ metadata:
   labels:
     app: nginx-v3
 spec:
-  replicas: 3
+  replicas: 2
   selector:
     matchLabels:
       app: nginx-v3
