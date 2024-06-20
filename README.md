@@ -1,10 +1,6 @@
 # Flipper Operator
 Flipper Operator - A Kubernetes operator for performing rolling restarts of deployments based on specific labels at configured intervals.
 
-# Flipper Operator
-
-The Flipper Operator is a Kubernetes operator designed to facilitate rolling restarts of deployments based on specific labels at configured intervals.
-
 ## Getting Started
 
 ### Prerequisites
@@ -134,24 +130,24 @@ kubectl apply -f config/test/rollingupdate-1.yaml
 kubectl apply -f config/test/rollingupdate-2.yaml
 kubectl apply -f config/test/rollingupdate-3.yaml
 ```
-#### Step 4: Verify the Rolling Updates
-**1. Verify Flipper Operator Reconciliation Logs**
+### Verify the Rolling Updates
+#### 1. Verify Flipper Operator Reconciliation Logs**
 
 Check the logs of the Flipper Operator to confirm that the reconciliation process is running smoothly and to monitor any related events
 ```sh
 ```
 
-**2. Verify RollingUpdate CR Status**
+#### 2. Verify RollingUpdate CR Status**
 Retrieve the status of the RollingUpdate custom resources to ensure they reflect the ongoing updates and their completion
 ```sh
 ```
 
-**3. Deployment and Pod Annotations**
+#### 3. Deployment and Pod Annotations**
 Verify the annotations on the deployments affected by the rolling updates to ensure they reflect the latest changes and updates
 ```sh
 ```
 
-**4. Check ReplicaSet Revision and Pod Restart Times**
+#### 4. Check ReplicaSet Revision and Pod Restart Times**
 Review the ReplicaSet revision history to verify that new revisions are created during the rolling update process, and monitor the pod restart times to ensure that pods are being restarted as expected
 ```sh
 ```
