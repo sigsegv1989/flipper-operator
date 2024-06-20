@@ -27,6 +27,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -193,12 +194,45 @@ var _ = Describe("controller", Ordered, func() {
 		}
 	}
 
+	checkDeploymentPodsReady := func(deploymentNames []string, namespace string) bool {
+		for _, deploymentName := range deploymentNames {
+			deployment, err := clientset.AppsV1().Deployments(namespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
+			if err != nil {
+				return false
+			}
+
+			// Construct a label selector that matches all labels in the deployment's pod template
+			selector := labels.Set(deployment.Spec.Selector.MatchLabels).AsSelector()
+
+			// List all pods in the namespace that match the label selector
+			podList, err := clientset.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
+				LabelSelector: selector.String(),
+			})
+			if err != nil {
+				return false
+			}
+
+			// Check readiness for each pod in the deployment
+			for _, pod := range podList.Items {
+				for _, condition := range pod.Status.Conditions {
+					if condition.Type == corev1.PodReady && condition.Status != corev1.ConditionTrue {
+						return false
+					}
+				}
+			}
+		}
+
+		return true
+	}
+
 	// Helper function to check if deployment pods have restarted
 	checkDeploymentPodsRestarted := func(deploymentName, namespace string) {
-		deployment, err := clientset.AppsV1().Deployments(namespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
-
+		var deployment *v1.Deployment
+		var err error
 		Eventually(func() bool {
+			deployment, err = clientset.AppsV1().Deployments(namespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
 			// Check if the annotation exists and is not empty
 			restartedAtExists := deployment.Annotations["kubectl.kubernetes.io/restartedAt"] != ""
 			restartedBy := deployment.Annotations["kubectl.kubernetes.io/restartedBy"] == "flipper-operator"
@@ -206,32 +240,41 @@ var _ = Describe("controller", Ordered, func() {
 			restartedByCRDKind := deployment.Annotations["flipper.example.com/restartedByCRDKind"] == "rollingupdate"
 
 			return restartedAtExists && restartedBy && restartedByCRExists && restartedByCRDKind
-		}, 2*time.Minute, 5*time.Second).Should(BeTrue())
+		}, 5*time.Minute, 5*time.Second).Should(BeTrue())
 
 		// Construct a label selector that matches all labels in the deployment's pod template
 		selector := labels.Set(deployment.Spec.Selector.MatchLabels).AsSelector()
 
-		// List all pods in the namespace that match the label selector
-		podList, err := clientset.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
-			LabelSelector: selector.String(),
-		})
-		Expect(err).NotTo(HaveOccurred())
+		By("waiting for deployment pods to be running")
+		Eventually(func() bool {
+			return checkDeploymentPodsReady([]string{deploymentName}, namespace)
+		}, 5*time.Minute, 5*time.Second).Should(BeTrue(), "Deployment pods did not become ready in time")
 
-		for _, pod := range podList.Items {
-			// Verify the pod's start time
-			Expect(pod.Status.StartTime.Time).To(BeTemporally(">", time.Now().Add(-5*time.Minute), time.Second))
+		// Verify annotations related to restart information
+		Eventually(func() bool {
+			// List all pods in the namespace that match the label selector
+			podList, err := clientset.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
+				LabelSelector: selector.String(),
+			})
+			Expect(err).NotTo(HaveOccurred())
 
-			// Verify annotations related to restart information
-			Eventually(func() bool {
+			for _, pod := range podList.Items {
+				// Verify the pod's start time
+				Expect(pod.Status.StartTime.Time).To(BeTemporally(">", time.Now().Add(-5*time.Minute), time.Second))
+
 				// Check if the annotation exists and is not empty
 				restartedAtExists := pod.Annotations["kubectl.kubernetes.io/restartedAt"] != ""
 				restartedBy := pod.Annotations["kubectl.kubernetes.io/restartedBy"] == "flipper-operator"
 				restartedByCRExists := pod.Annotations["flipper.example.com/restartedByCR"] != ""
 				restartedByCRDKind := pod.Annotations["flipper.example.com/restartedByCRDKind"] == "rollingupdate"
 
-				return restartedAtExists && restartedBy && restartedByCRExists && restartedByCRDKind
-			}, 2*time.Minute, 5*time.Second).Should(BeTrue())
-		}
+				if !(restartedAtExists && restartedBy && restartedByCRExists && restartedByCRDKind) {
+					return false
+				}
+			}
+
+			return true
+		}, 5*time.Minute, 5*time.Second).Should(BeTrue())
 	}
 
 	// Helper function to verify RollingUpdate CR and deployment pods
@@ -308,37 +351,6 @@ var _ = Describe("controller", Ordered, func() {
 		for _, deploymentName := range expectedDeployments {
 			checkDeploymentPodsRestarted(deploymentName, namespace)
 		}
-	}
-
-	checkDeploymentPodsReady := func(deploymentNames []string, namespace string) bool {
-		for _, deploymentName := range deploymentNames {
-			deployment, err := clientset.AppsV1().Deployments(namespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
-			if err != nil {
-				return false
-			}
-
-			// Construct a label selector that matches all labels in the deployment's pod template
-			selector := labels.Set(deployment.Spec.Selector.MatchLabels).AsSelector()
-
-			// List all pods in the namespace that match the label selector
-			podList, err := clientset.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: selector.String(),
-			})
-			if err != nil {
-				return false
-			}
-
-			// Check readiness for each pod in the deployment
-			for _, pod := range podList.Items {
-				for _, condition := range pod.Status.Conditions {
-					if condition.Type == corev1.PodReady && condition.Status != corev1.ConditionTrue {
-						return false
-					}
-				}
-			}
-		}
-
-		return true
 	}
 
 	Context("Namespace test-1", func() {
